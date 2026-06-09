@@ -343,7 +343,11 @@ static UIImage *YTImageNamed(NSString *imageName) {
     NSString *originalVersion = %orig;
     NSString *fakeVersion = @"18.18.2";
 
-    return (!ytlBool(@"classicQuality") && !ytlBool(@"extraSpeedOptions") && [originalVersion compare:fakeVersion options:NSNumericSearch] == NSOrderedDescending) ? originalVersion : fakeVersion;
+    // Also spoof when HoldToSpeed or DefaultPlaybackRate is set to >2x (indices 10+ / 8+)
+    BOOL needsSpoof = ytlBool(@"classicQuality") || ytlBool(@"extraSpeedOptions")
+        || ytlInt(@"speedIndex") >= 10 || ytlInt(@"autoSpeedIndex") >= 8;
+
+    return (!needsSpoof && [originalVersion compare:fakeVersion options:NSNumericSearch] == NSOrderedDescending) ? originalVersion : fakeVersion;
 }
 %end
 
@@ -407,6 +411,8 @@ static UIImage *YTImageNamed(NSString *imageName) {
 
 void addEndTime(YTPlayerViewController *self, YTSingleVideoController *video, YTSingleVideoTime *time) {
     if (!ytlBool(@"videoEndTime")) return;
+    // Guard against YouTube versions where playbackRate was removed/renamed
+    if (![video respondsToSelector:@selector(playbackRate)]) return;
 
     CGFloat rate = video.playbackRate != 0 ? video.playbackRate : 1.0;
     NSTimeInterval remainingTime = (lround(video.totalMediaTime) - lround(time.time)) / rate;
