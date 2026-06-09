@@ -98,6 +98,9 @@ jobs:
           #endif
           EOF
 
+      - name: Clone YouTubeHeader (required for ../YouTubeHeader/ imports)
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouTubeHeader.git
+
       - name: Checkout YTLiteJimbb
         uses: actions/checkout@v6
         with:
@@ -108,19 +111,6 @@ jobs:
           cd YTLiteJimbb && make clean package DEBUG=0 FINALPACKAGE=1
           mv packages/*.deb ../ytplus.deb
 
-      - name: Clone YouTubeHeader
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc }}
-        run: |
-          if [ -d "$THEOS/include/YouTubeHeader" ]; then
-            cd $THEOS/include/YouTubeHeader && git pull
-          else
-            cd $THEOS/include && git clone --quiet --depth=1 https://github.com/PoomSmart/YouTubeHeader.git
-          fi
-          if [ "${{ inputs.enable_demc }}" = "true" ]; then
-            rm -rf "$THEOS/include/YTHeaders"
-            cp -r "$THEOS/include/YouTubeHeader" "$THEOS/include/YTHeaders"
-          fi
-
       - name: Clone PSHeader
         if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc }}
         run: |
@@ -128,6 +118,14 @@ jobs:
             cd $THEOS/include/PSHeader && git pull
           else
             cd $THEOS/include && git clone --quiet --depth=1 https://github.com/PoomSmart/PSHeader.git
+          fi
+
+      - name: Copy YouTubeHeader into Theos include (for optional tweaks)
+        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc }}
+        run: |
+          cp -r YouTubeHeader $THEOS/include/YouTubeHeader
+          if [ "${{ inputs.enable_demc }}" = "true" ]; then
+            cp -r YouTubeHeader $THEOS/include/YTHeaders
           fi
 
       - name: Clone YouPiP
