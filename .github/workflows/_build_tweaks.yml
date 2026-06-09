@@ -85,6 +85,19 @@ jobs:
           git checkout
           mv *.sdk $THEOS/sdks
 
+      - name: Create roothide.h stub (sideloading - jbroot is a passthrough)
+        run: |
+          mkdir -p ${{ github.workspace }}/theos/vendor/include
+          cat > ${{ github.workspace }}/theos/vendor/include/roothide.h << 'EOF'
+          #pragma once
+          #ifndef jbroot
+          #define jbroot(x) (x)
+          #endif
+          #ifndef rootfs
+          #define rootfs(x) (x)
+          #endif
+          EOF
+
       - name: Checkout YTLiteJimbb
         uses: actions/checkout@v6
         with:
