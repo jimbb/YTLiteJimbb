@@ -58,6 +58,9 @@ jobs:
           #endif
           EOF
 
+      - name: Clone YouTubeHeader (required for ../YouTubeHeader/ imports)
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouTubeHeader.git
+
       - name: Checkout YTLiteJimbb
         uses: actions/checkout@v6
         with:
