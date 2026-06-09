@@ -347,6 +347,27 @@ static UIImage *YTImageNamed(NSString *imageName) {
 }
 %end
 
+// Disable AV1 / Fix Playback Issues
+%hook YTSingleVideoController
+- (NSArray *)selectableVideoFormats {
+    NSArray *formats = %orig;
+    if (!ytlBool(@"disableAV1") && !ytlBool(@"fixPlayback")) return formats;
+
+    return [formats filteredArrayUsingPredicate:[NSPredicate predicateWithBlock:^BOOL(MLFormat *format, NSDictionary *bindings) {
+        NSString *quality = format.qualityLabel ?: @"";
+        NSString *mime = ([format respondsToSelector:@selector(mimeType)] ? format.mimeType : nil) ?: @"";
+        BOOL isAV1 = [mime containsString:@"av01"];
+        BOOL isHDR = [quality containsString:@"HDR"];
+        BOOL isHighResHeavy = format.singleDimensionResolution > 1080 &&
+            ([mime containsString:@"vp9"] || [mime containsString:@"vp09"] || isAV1);
+
+        if (ytlBool(@"disableAV1") && isAV1) return NO;
+        if (ytlBool(@"fixPlayback") && (isHDR || isHighResHeavy)) return NO;
+        return YES;
+    }]];
+}
+%end
+
 // Show real version in YT Settings
 %hook YTSettingsCell
 - (void)setDetailText:(id)arg1 {
