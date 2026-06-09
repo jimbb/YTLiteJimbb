@@ -116,6 +116,7 @@
 @interface MLFormat : NSObject
 @property (nonatomic, assign, readonly) NSString *qualityLabel;
 @property (nonatomic, assign, readonly) int singleDimensionResolution;
+@property (nonatomic, assign, readonly) NSString *mimeType;
 @end
 
 @interface YTSingleVideoTime : NSObject
