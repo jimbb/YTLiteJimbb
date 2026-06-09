@@ -58,12 +58,12 @@ jobs:
           #endif
           EOF
 
-      - name: Clone YouTubeHeader (required for ../YouTubeHeader/ imports)
+      - name: Clone YouTubeHeader
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouTubeHeader.git
 
-      - name: Clone protobuf objectivec headers (required for YTNativeShare)
+      - name: Clone protobuf objectivec headers (v25.3 - last version with GPBUnknownFieldSet)
         run: |
-          git clone --quiet -n --depth=1 --filter=tree:0 https://github.com/protocolbuffers/protobuf.git protobuf
+          git clone --quiet -n --depth=1 --filter=tree:0 --branch v25.3 https://github.com/protocolbuffers/protobuf.git protobuf
           cd protobuf
           git sparse-checkout set --no-cone objectivec
           git checkout
