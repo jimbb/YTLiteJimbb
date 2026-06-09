@@ -105,6 +105,10 @@
 "PlaybackQualityOnWiFiDesc" = "Automatically applies the selected quality when streaming over Wi-Fi";
 "PlaybackQualityOnCellular" = "Playback quality on Cellular";
 "PlaybackQualityOnCellularDesc" = "Automatically applies the selected quality when streaming over mobile data";
+"DisableAV1" = "Disable AV1";
+"DisableAV1Desc" = "Disables AV1 codec for video playback. May improve compatibility on older devices.";
+"FixPlayback" = "Fix playback issues";
+"FixPlaybackDesc" = "Disables HDR and high-resolution VP9/AV1 codecs that may cause playback issues.";
 
 "PreferredCaptions" = "Preferred captions";
 "Original" = "Original";
