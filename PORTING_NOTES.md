@@ -3,7 +3,7 @@
 This fork builds **YTLite 3.0.1** from source (dayanch96's last open-source release, March 2024). Releases 4.0 through 5.2.2 were binary-only, so their fixes were re-implemented here from the public release notes, a dump of YouTube 21.38.2's Objective-C metadata, and [YouMod](https://github.com/Tonwalter888/YouMod) (GPL-3.0).
 
 - **Target:** YouTube 21.38.2 (needs iOS 17+), sideloaded through LiveContainer.
-- **Status:** every hook and API call below was checked against the 21.38.2 binary; **none of it has been tested on a device yet**.
+- **Status:** every hook and API call below was checked against the 21.38.2 binary. On device (v4 build): launches and plays; the YTLite settings entry was missing (fixed in v5). Individual features are still untested.
 
 ## What the build contains
 
@@ -12,6 +12,8 @@ This fork builds **YTLite 3.0.1** from source (dayanch96's last open-source rele
 | Add-on | Source | Default |
 |---|---|---|
 | YouTube-X (ads, background play) | PoomSmart/YouTube-X | **on** |
+| YouSpeed (speed button in the overlay, speeds up to 5x, slider picker) | PoomSmart/YouSpeed | **on** |
+| iSponsorBlock (built without libcolorpicker) | Galactic-Dev/iSponsorBlock | **on** |
 | YouPiP, YouQuality, Return YouTube Dislikes, YTABConfig | PoomSmart | off |
 | YTUHD (built with `SIDELOAD=1`, bundled libvpx/dav1d) | PoomSmart/YTUHD | off |
 | DontEatMyContent | therealFoxster | off |
@@ -22,6 +24,7 @@ The decrypted IPA can be passed as a draft-release tag (e.g. `ipa-21.38.2`) inst
 
 | Area | What changed in YouTube | Fix | Source |
 |---|---|---|---|
+| **YTLite settings entry** (was missing on device) | settings page is grouped (`YTSettingsGroupData`); `settingsCategoryOrder` no longer adds a row | join YouGroupSettings' "Tweaks" group, else prepend to the main group | own analysis, PoomSmart's pattern |
 | Promo throttle, settings (hints, cast discovery), content warning, classic quality, extra speeds, menu items, resume-to-Shorts, pivot bar | Classes split into protocol + `…Impl` | `%init` remap, old class preferred | own analysis |
 | Default quality/speed, auto fullscreen, Shorts→regular, captions off | `loadWithPlayerTransition:playbackConfig:` gone | hook `prepareToLoadWithPlayerTransition:expectedLayout:` | own analysis, matches PoomSmart/YTAutoFullScreen |
 | Hold to speed | `scrubUserEducationView` moved to `YTDoubleTapToSeekController` (**crash**) | look it up there | own analysis |
@@ -46,14 +49,14 @@ The decrypted IPA can be passed as a draft-release tag (e.g. `ipa-21.38.2`) inst
 These are features, not fixes, and each is its own project:
 
 - **Downloads**: video, audio, captions, thumbnails, multi-download, resume.
-- **SponsorBlock**: segments, whitelist, user IDs.
 - **Gestures**: player gestures (brightness, volume, seek on either side), tap/swipe to seek, and hold-to-speed in Shorts.
 - **Settings UI**: rewrite and search, import/export, account system.
 - **Themes**: OLED theme and keyboard, logo selector, custom startup animation.
 - **Tab bar**: reordering, extra tabs (Watch later, History, Posts, Hype, Music, Live…), translucent bar.
 - **Tools**: sleep timer, Discord RPC, post and comment translation, image viewer, external players (Infuse/VLC), Control Center seek, clipboard link opener, link tracking removal.
 - **Preferences**: preferred audio track and caption language, excluding auto-dubbed tracks, remember loop mode.
-- **Custom speed engine** (up to 10x with a slider).
+- **Custom speed engine** (up to 10x with a slider). Covered up to **5x** by the YouSpeed add-on (overlay button and slider). YTLite's own "Extra speed options" skips rates YouSpeed already lists.
+- **SponsorBlock**: covered by the iSponsorBlock add-on (settings via the button it adds at the top right). On 21.38.2, segment markers on the progress bar won't show (`YTSegmentableInlinePlayerBarView setSkipSegments:` is gone); skipping itself uses live hooks. The segment colour picker is hidden because libcolorpicker isn't bundled.
 
 YouMod implements many of these in open source (downloads up to 1080p60, SponsorBlock, translation, OLED, tab reordering, audio track selection), so any of them can be ported from there with GPL-3.0 attribution.
 
