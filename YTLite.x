@@ -272,6 +272,24 @@ static UIImage *YTImageNamed(NSString *imageName) {
 - (void)setRelatedVideosVisible:(BOOL)arg1 { ytlBool(@"noRelatedVids") ? %orig(NO) : %orig; }
 %end
 
+// Sideloaded builds can hit playback error 14 ("An error occurred"); reload the video once instead of showing it.
+// From YouMod (https://github.com/Tonwalter888/YouMod, GPL-3.0), originally Mark02-2012/YTPlaybackFix; the once-per-video
+// guard is ours so a persistent error can't loop.
+%hook YTMainAppVideoPlayerOverlayViewController
+- (void)handleError:(NSError *)error {
+    static NSString *lastReloadedVideoID;
+    YTPlayerViewController *playerVC = self.parentViewController;
+    if ([error.domain isEqualToString:@"com.google.ios.youtube.ErrorDomain.playback"] && error.code == 14
+        && [playerVC.UIDelegate isKindOfClass:%c(YTWatchController)] && ![playerVC.contentVideoID isEqualToString:lastReloadedVideoID]) {
+        lastReloadedVideoID = playerVC.contentVideoID;
+        YTWatchController *watchController = (YTWatchController *)playerVC.UIDelegate;
+        dispatch_async(dispatch_get_main_queue(), ^{ [watchController reload]; });
+        return;
+    }
+    %orig;
+}
+%end
+
 // Hide Paid Promotion Cards
 %hook YTMainAppVideoPlayerOverlayViewController
 - (void)setPaidContentWithPlayerData:(id)data { if (!ytlBool(@"noPromotionCards")) %orig; }
@@ -356,6 +374,14 @@ static BOOL ytlWantsFastRates(void) {
 
 %hook YTSingleVideoController
 - (float)maximumSupportedPlaybackRate { float rate = %orig; return ytlWantsFastRates() ? MAX(rate, 5.0f) : rate; }
+%end
+
+// Same cap read straight from the protobuf config (as YouMod does); protobuf getters are dynamic, so add the method
+%group gFastRates
+%hook YTIPlayerHotConfig
+%new(f@:)
+- (float)maximumPlaybackRate { return 5.0f; }
+%end
 %end
 
 // Disable AV1 / Fix Playback Issues
@@ -1025,7 +1051,55 @@ static void genImageFromLayer(CALayer *layer, UIColor *backgroundColor, void (^c
 }
 %end
 
+// YouTube 21.x builds the Shorts action bar and newer feed ads as Elements (ASDK) nodes, so the old
+// YTReelWatchPlaybackOverlayView setters are gone. Match by accessibility identifier and drop the node from its
+// yoga parent so no gap is left. Identifiers + technique from YouMod (https://github.com/Tonwalter888/YouMod, GPL-3.0).
+static NSDictionary <NSString *, NSString *> *ytlShortsButtonKeys(void) {
+    static NSDictionary *keys;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        keys = @{
+            @"id.reel_like_button": @"hideShortsLike",
+            @"id.reel_like_toggled_button": @"hideShortsLike",
+            @"id.reel_dislike_button": @"hideShortsDislike", // unverified: not in YouMod, guessed from the like button's id
+            @"id.reel_dislike_toggled_button": @"hideShortsDislike",
+            @"id.reel_comment_button": @"hideShortsComments",
+            @"id.reel_share_button": @"hideShortsShare",
+            @"id.reel_remix_button": @"hideShortsRemix",
+            @"id.reel_pivot_button": @"hideShortsAvatars"
+        };
+    });
+    return keys;
+}
+
 %hook _ASDisplayView
+- (void)didMoveToWindow {
+    %orig;
+
+    NSString *iden = self.accessibilityIdentifier;
+    if (iden.length == 0) return;
+
+    if (ytlBool(@"noAds") && [iden containsString:@"eml.ad_layout."]) {
+        UIView *cell = self.superview;
+        while (cell && ![cell isKindOfClass:%c(_ASCollectionViewCell)]) cell = cell.superview;
+        ASDisplayNode *node = [(_ASCollectionViewCell *)cell node];
+        for (ASDisplayNode *child in [node.yogaChildren copy]) [node removeYogaChild:child];
+        return;
+    }
+
+    NSString *key = ytlShortsButtonKeys()[iden];
+    if (!key || !ytlBool(key)) return;
+    id parentView = self.superview;
+    ASDisplayNode *parent = [parentView respondsToSelector:@selector(keepalive_node)] ? [parentView keepalive_node] : nil;
+    for (ASDisplayNode *child in [parent.yogaChildren copy]) {
+        if ([[child description] containsString:iden]) {
+            [parent removeYogaChild:child];
+            [self removeFromSuperview];
+            break;
+        }
+    }
+}
+
 - (void)setKeepalive_node:(id)arg1 {
     %orig;
 
@@ -1435,6 +1509,7 @@ static NSURL *newCoverURL(NSURL *originalURL) {
 #define YTL_OR_IMPL(c) (objc_getClass(#c) ?: objc_getClass(#c "Impl"))
 
 %ctor {
+    if (ytlWantsFastRates()) %init(gFastRates);
     %init(YTPromoThrottleController = YTL_OR_IMPL(YTPromoThrottleController), YTSettings = YTL_OR_IMPL(YTSettings), YTPlayabilityResolutionUserActionUIController = YTL_OR_IMPL(YTPlayabilityResolutionUserActionUIController), YTVideoQualitySwitchControllerFactory = YTL_OR_IMPL(YTVideoQualitySwitchControllerFactory), YTVarispeedSwitchController = YTL_OR_IMPL(YTVarispeedSwitchController), YTMenuItemVisibilityHandler = YTL_OR_IMPL(YTMenuItemVisibilityHandler), YTShortsStartupCoordinator = YTL_OR_IMPL(YTShortsStartupCoordinator), YTAppViewController = YTL_OR_IMPL(YTAppViewController), YTWatchMiniBarViewController = (objc_getClass("YTWatchMiniBarViewController") ?: objc_getClass("YTWatchFloatingMiniplayerViewController")), YTDataUtils = (objc_getClass("YTAdShieldUtils") ?: objc_getClass("YTDataUtils")));
 
     if (ytlBool(@"shortsOnlyMode") && (ytlBool(@"removeShorts") || ytlBool(@"reExplore"))) {

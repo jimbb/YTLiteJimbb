@@ -157,6 +157,10 @@
 - (void)pause;
 @end
 
+@interface YTWatchController ()
+- (void)reload;
+@end
+
 @interface YTPlayerView : UIView
 @property (nonatomic, weak, readwrite) YTPlayerViewController *playerViewDelegate;
 @property (nonatomic, strong, readwrite) UIView *overlayView;
@@ -259,6 +263,7 @@
 @property (atomic, assign, readonly) ASNodeAncestryEnumerator *supernodes;
 // @property (atomic, copy, readwrite) NSArray *yogaChildren;
 @property (atomic) CALayer *layer;
+- (void)removeYogaChild:(ASDisplayNode *)child;
 @end
 
 @interface ELMContainerNode : ASDisplayNode
