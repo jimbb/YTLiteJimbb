@@ -178,6 +178,9 @@ jobs:
         if: ${{ inputs.enable_ytuhd }}
         run: |
           brew install meson ninja
+          # Makefile's auto-build of these libs doesn't trigger on our pinned Theos; build them up front
+          YTUHD/vendor/build_libvpx.sh
+          YTUHD/vendor/build_dav1d.sh
           cd YTUHD && make clean package DEBUG=0 FINALPACKAGE=1 SIDELOAD=1
           mv packages/*.deb ../ytuhd.deb
 
