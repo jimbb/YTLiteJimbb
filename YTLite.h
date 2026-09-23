@@ -144,6 +144,7 @@
 - (void)turnOffCaptions;
 - (void)setAutoSpeed;
 - (void)autoQuality;
+- (void)ytlApplyLoadPrefs;
 - (void)play;
 - (void)pause;
 @end
