@@ -455,7 +455,17 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
 %hook YTPlayerViewController
 - (void)loadWithPlayerTransition:(id)arg1 playbackConfig:(id)arg2 {
     %orig;
+    [self ytlApplyLoadPrefs];
+}
 
+// YouTube 21.3x+ renamed the above
+- (void)loadWithPlayerTransition:(id)arg1 playbackConfig:(id)arg2 initialTime:(id)arg3 {
+    %orig;
+    [self ytlApplyLoadPrefs];
+}
+
+%new
+- (void)ytlApplyLoadPrefs {
     if (ytlInt(@"wiFiQualityIndex") != 0 || ytlInt(@"cellQualityIndex") != 0) [self performSelector:@selector(autoQuality) withObject:nil afterDelay:1.0];
     if (ytlBool(@"autoFullscreen")) [self performSelector:@selector(autoFullscreen) withObject:nil afterDelay:0.75];
     if (ytlBool(@"shortsToRegular")) [self performSelector:@selector(shortsToRegular) withObject:nil afterDelay:0.75];
