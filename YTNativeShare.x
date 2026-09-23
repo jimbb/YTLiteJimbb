@@ -55,6 +55,26 @@
 + (GPBExtensionDescriptor*)innertubeCommand;
 @end
 
+// protobuf 28+ (YouTube 21.x): extensions are no longer class methods on *Root classes, and
+// -[GPBMessage unknownFields] is gone in favour of GPBUnknownFields
+@interface GPBUnknownFields : NSObject
+- (instancetype)initFromMessage:(GPBMessage *)message;
+- (NSData *)firstLengthDelimited:(int32_t)fieldNumber;
+@end
+
+static GPBExtensionDescriptor *extensionNamed(GPBMessage *message, NSString *singletonName) {
+    for (GPBExtensionDescriptor *extension in [message extensionsCurrentlySet])
+        if ([extension.singletonName isEqualToString:singletonName]) return extension;
+    return nil;
+}
+
+static NSData *firstLengthDelimited(GPBMessage *message, int32_t fieldNumber) {
+    Class unknownFieldsClass = %c(GPBUnknownFields);
+    if (unknownFieldsClass) return [[[unknownFieldsClass alloc] initFromMessage:message] firstLengthDelimited:fieldNumber];
+    GPBUnknownField *field = [message.unknownFields getField:fieldNumber];
+    return field.lengthDelimitedList.count == 1 ? field.lengthDelimitedList.firstObject : nil;
+}
+
 typedef NS_ENUM(NSInteger, ShareEntityType) {
     ShareEntityFieldVideo = 1,
     ShareEntityFieldPlaylist = 2,
@@ -62,13 +82,11 @@ typedef NS_ENUM(NSInteger, ShareEntityType) {
     ShareEntityFieldClip = 8
 };
 
-static inline NSString* extractIdWithFormat(GPBUnknownFieldSet *fields, NSInteger fieldNumber, NSString *format) {
-    if (![fields hasField:fieldNumber])
+static inline NSString* extractIdWithFormat(GPBMessage *message, NSInteger fieldNumber, NSString *format) {
+    NSData *idData = firstLengthDelimited(message, (int32_t)fieldNumber);
+    if (!idData)
         return nil;
-    GPBUnknownField *idField = [fields getField:fieldNumber];
-    if ([idField.lengthDelimitedList count] != 1)
-        return nil;
-    NSString *id = [[NSString alloc] initWithData:[idField.lengthDelimitedList firstObject] encoding:NSUTF8StringEncoding];
+    NSString *id = [[NSString alloc] initWithData:idData encoding:NSUTF8StringEncoding];
     return [NSString stringWithFormat:format, id];
 }
 
@@ -79,11 +97,19 @@ static inline NSString* extractIdWithFormat(GPBUnknownFieldSet *fields, NSIntege
 
     if (!self.hasOnAppear)
         return %orig;
-    GPBExtensionDescriptor *innertubeCommandDescriptor = [%c(YTIInnertubeCommandExtensionRoot) innertubeCommand];
+    Class innertubeRoot = %c(YTIInnertubeCommandExtensionRoot);
+    GPBExtensionDescriptor *innertubeCommandDescriptor = [innertubeRoot respondsToSelector:@selector(innertubeCommand)]
+        ? [innertubeRoot innertubeCommand] : extensionNamed(self.onAppear, @"YTIInnertubeCommandExtensionRoot_innertubeCommand");
+    if (!innertubeCommandDescriptor)
+        return %orig;
     if (![self.onAppear hasExtension:innertubeCommandDescriptor])
         return %orig;
     YTICommand *innertubeCommand = [self.onAppear getExtension:innertubeCommandDescriptor];
-    GPBExtensionDescriptor *updateShareSheetCommandDescriptor = [%c(YTIUpdateShareSheetCommand) updateShareSheetCommand];
+    Class updateShareSheetClass = %c(YTIUpdateShareSheetCommand);
+    GPBExtensionDescriptor *updateShareSheetCommandDescriptor = [updateShareSheetClass respondsToSelector:@selector(updateShareSheetCommand)]
+        ? [updateShareSheetClass updateShareSheetCommand] : extensionNamed(innertubeCommand, @"YTIUpdateShareSheetCommand_updateShareSheetCommand");
+    if (!updateShareSheetCommandDescriptor)
+        return %orig;
     if(![innertubeCommand hasExtension:updateShareSheetCommandDescriptor])
         return %orig;
     YTIUpdateShareSheetCommand *updateShareSheetCommand = [innertubeCommand getExtension:updateShareSheetCommandDescriptor];
@@ -91,22 +117,19 @@ static inline NSString* extractIdWithFormat(GPBUnknownFieldSet *fields, NSIntege
         return %orig;
 
     GPBMessage *shareEntity = [%c(GPBMessage) deserializeFromString:updateShareSheetCommand.serializedShareEntity];
-    GPBUnknownFieldSet *fields = shareEntity.unknownFields;
     NSString *shareUrl;
 
-    if ([fields hasField:ShareEntityFieldClip]) {
-        GPBUnknownField *shareEntityClip = [fields getField:ShareEntityFieldClip];
-        if ([shareEntityClip.lengthDelimitedList count] != 1)
-            return %orig;
-        GPBMessage *clipMessage = [%c(GPBMessage) parseFromData:[shareEntityClip.lengthDelimitedList firstObject] error:nil];
-        shareUrl = extractIdWithFormat(clipMessage.unknownFields, 1, @"https://youtube.com/clip/%@");
+    NSData *clipData = firstLengthDelimited(shareEntity, ShareEntityFieldClip);
+    if (clipData) {
+        GPBMessage *clipMessage = [%c(GPBMessage) parseFromData:clipData error:nil];
+        shareUrl = extractIdWithFormat(clipMessage, 1, @"https://youtube.com/clip/%@");
     }
 
     if (!shareUrl)
-        shareUrl = extractIdWithFormat(fields, ShareEntityFieldChannel, @"https://youtube.com/channel/%@");
+        shareUrl = extractIdWithFormat(shareEntity, ShareEntityFieldChannel, @"https://youtube.com/channel/%@");
 
     if (!shareUrl) {
-        shareUrl = extractIdWithFormat(fields, ShareEntityFieldPlaylist, @"%@");
+        shareUrl = extractIdWithFormat(shareEntity, ShareEntityFieldPlaylist, @"%@");
         if (shareUrl) {
             if (![shareUrl hasPrefix:@"PL"] && ![shareUrl hasPrefix:@"FL"])
                 shareUrl = [shareUrl stringByAppendingString:@"&playnext=1"];
@@ -115,7 +138,7 @@ static inline NSString* extractIdWithFormat(GPBUnknownFieldSet *fields, NSIntege
     }
 
     if (!shareUrl)
-        shareUrl = extractIdWithFormat(fields, ShareEntityFieldVideo, @"https://youtube.com/watch?v=%@");
+        shareUrl = extractIdWithFormat(shareEntity, ShareEntityFieldVideo, @"https://youtube.com/watch?v=%@");
 
     if (!shareUrl)
         return %orig;

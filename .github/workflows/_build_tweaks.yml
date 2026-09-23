@@ -33,6 +33,11 @@ on:
         required: true
         default: false
 
+      enable_ytx:
+        type: boolean
+        required: false
+        default: false
+
       tweak_version:
         type: string
         required: false
@@ -119,7 +124,7 @@ jobs:
           mv packages/*.deb ../ytplus.deb
 
       - name: Copy YouTubeHeader into Theos include (for optional tweaks)
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc }}
+        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc || inputs.enable_ytx }}
         run: |
           rm -rf $THEOS/include/YouTubeHeader $THEOS/include/YTHeaders
           cp -r YouTubeHeader $THEOS/include/YouTubeHeader
@@ -128,7 +133,7 @@ jobs:
           fi
 
       - name: Clone PSHeader
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc }}
+        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc || inputs.enable_ytx }}
         run: |
           if [ -d "$THEOS/include/PSHeader" ]; then
             cd $THEOS/include/PSHeader && git pull
@@ -167,6 +172,10 @@ jobs:
       - name: Clone DontEatMyContent
         if: ${{ inputs.enable_demc }}
         run: git clone --quiet --depth=1 https://github.com/therealFoxster/DontEatMyContent.git
+
+      - name: Clone YouTube-X
+        if: ${{ inputs.enable_ytx }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouTube-X.git
 
       - name: Build YouPiP
         if: ${{ inputs.enable_youpip }}
@@ -219,6 +228,12 @@ jobs:
         run: |
           cd DontEatMyContent && make clean package DEBUG=0 FINALPACKAGE=1
           mv packages/*.deb ../demc.deb
+
+      - name: Build YouTube-X
+        if: ${{ inputs.enable_ytx }}
+        run: |
+          cd YouTube-X && make clean package DEBUG=0 FINALPACKAGE=1
+          mv packages/*.deb ../ytx.deb
 
       - name: Clone Open in YouTube (Safari extension)
         run: |

@@ -1,4 +1,5 @@
 #import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 #import <Foundation/Foundation.h>
 #import <Photos/Photos.h>
 #import "Utils/NSBundle+YTLite.h"
@@ -123,8 +124,13 @@
 @property (nonatomic, assign, readonly) CGFloat time;
 @end
 
+@interface YTPlaybackRateModel : NSObject
+@property (nonatomic, assign, readonly) float rate;
+@end
+
 @interface YTSingleVideoController : NSObject
 @property (nonatomic, assign, readonly) float playbackRate;
+@property (nonatomic, readonly) YTPlaybackRateModel *activePlaybackRateModel; // 21.x replacement for playbackRate
 @property (nonatomic, assign, readonly) CGFloat totalMediaTime;
 @property (nonatomic, assign, readonly) NSArray *selectableVideoFormats;
 - (void)setVideoFormatConstraint:(MLQuickMenuVideoQualitySettingFormatConstraint *)formatConstraint;
@@ -138,6 +144,8 @@
 @property (nonatomic, weak, readwrite) UIViewController *UIDelegate;
 @property (nonatomic, readonly) NSString *contentVideoID;
 - (void)setActiveCaptionTrack:(id)track;
+- (void)setActiveCaptionTrack:(id)track source:(NSInteger)source; // 21.x
+@property (nonatomic, readonly) YTPlayerResponse *contentPlayerResponse; // 21.x replacement for playerResponse
 - (void)setPlaybackRate:(CGFloat)rate;
 - (void)shortsToRegular;
 - (void)autoFullscreen;

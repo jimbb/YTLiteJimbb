@@ -1,5 +1,10 @@
 #import "YTLite.h"
 
+static UIResponder *ytlFindResponder(UIResponder *responder, Class cls) {
+    while (responder && ![responder isKindOfClass:cls]) responder = responder.nextResponder;
+    return responder;
+}
+
 static UIImage *YTImageNamed(NSString *imageName) {
     return [UIImage imageNamed:imageName inBundle:[NSBundle mainBundle] compatibleWithTraitCollection:nil];
 }
@@ -20,8 +25,8 @@ static UIImage *YTImageNamed(NSString *imageName) {
 %end
 
 %hook YTDataUtils
-+ (id)spamSignalsDictionary { return ytlBool(@"noAds") ? nil : %orig; }
-+ (id)spamSignalsDictionaryWithoutIDFA { return ytlBool(@"noAds") ? nil : %orig; }
++ (id)spamSignalsDictionary { return ytlBool(@"noAds") ? @{} : %orig; }
++ (id)spamSignalsDictionaryWithoutIDFA { return ytlBool(@"noAds") ? @{} : %orig; }
 %end
 
 %hook YTAdsInnerTubeContextDecorator
@@ -212,7 +217,8 @@ static UIImage *YTImageNamed(NSString *imageName) {
 
     if (!ytlBool(@"pauseOnOverlay")) return;
 
-    visible ? [self.playerViewController pause] : [self.playerViewController play];
+    YTPlayerViewController *playerVC = [self respondsToSelector:@selector(playerViewController)] ? self.playerViewController : (YTPlayerViewController *)ytlFindResponder(self, %c(YTPlayerViewController));
+    visible ? [playerVC pause] : [playerVC play];
 }
 %end
 
@@ -338,18 +344,18 @@ static UIImage *YTImageNamed(NSString *imageName) {
 }
 %end
 
-// Temprorary Fix For 'Classic Video Quality' and 'Extra Speed Options'
-%hook YTVersionUtils
-+ (NSString *)appVersion {
-    NSString *originalVersion = %orig;
-    NSString *fakeVersion = @"18.18.2";
-
-    // Also spoof when HoldToSpeed or DefaultPlaybackRate is set to >2x (indices 10+ / 8+)
-    BOOL needsSpoof = ytlBool(@"classicQuality") || ytlBool(@"extraSpeedOptions")
-        || ytlInt(@"speedIndex") >= 10 || ytlInt(@"autoSpeedIndex") >= 8;
-
-    return (!needsSpoof && [originalVersion compare:fakeVersion options:NSNumericSearch] == NSOrderedDescending) ? originalVersion : fakeVersion;
+// Speeds above 2x (Extra Speed Options, Hold to speed / Default speed at 3x+): lift YouTube's playback rate cap
+// instead of spoofing the app version, which newer YouTube servers no longer tolerate
+static BOOL ytlWantsFastRates(void) {
+    return ytlBool(@"extraSpeedOptions") || ytlInt(@"speedIndex") >= 10 || ytlInt(@"autoSpeedIndex") >= 8;
 }
+
+%hook YTHotConfig
+- (float)maximumPlaybackRate { float rate = %orig; return ytlWantsFastRates() ? MAX(rate, 5.0f) : rate; }
+%end
+
+%hook YTSingleVideoController
+- (float)maximumSupportedPlaybackRate { float rate = %orig; return ytlWantsFastRates() ? MAX(rate, 5.0f) : rate; }
 %end
 
 // Disable AV1 / Fix Playback Issues
@@ -373,18 +379,6 @@ static UIImage *YTImageNamed(NSString *imageName) {
 }
 %end
 
-// Show real version in YT Settings
-%hook YTSettingsCell
-- (void)setDetailText:(id)arg1 {
-    NSDictionary *infoDictionary = [[NSBundle mainBundle] infoDictionary];
-    NSString *appVersion = infoDictionary[@"CFBundleShortVersionString"];
-
-    if ([arg1 isEqualToString:@"18.18.2"]) {
-        arg1 = appVersion;
-    } %orig(arg1);
-}
-%end
-
 // Disable Snap To Chapter (https://github.com/qnblackcat/uYouPlus/blob/main/uYouPlus.xm#L457-464)
 %hook YTSegmentableInlinePlayerBarView
 - (void)didMoveToWindow { %orig; if (ytlBool(@"dontSnapToChapter")) self.enableSnapToChapter = NO; }
@@ -405,6 +399,7 @@ static UIImage *YTImageNamed(NSString *imageName) {
 
 %hook YTPlayerBarSegmentView
 - (void)setBufferedProgressBarColor:(id)arg1 { %orig(ytlBool(@"redProgressBar") ? [UIColor colorWithRed:0.65 green:0.65 blue:0.65 alpha:0.60] : arg1); }
+- (void)setProgressBarColor:(id)arg1 { %orig(ytlBool(@"redProgressBar") ? [UIColor redColor] : arg1); }
 %end
 
 // Disable Hints
@@ -420,10 +415,9 @@ static UIImage *YTImageNamed(NSString *imageName) {
 
 void addEndTime(YTPlayerViewController *self, YTSingleVideoController *video, YTSingleVideoTime *time) {
     if (!ytlBool(@"videoEndTime")) return;
-    // Guard against YouTube versions where playbackRate was removed/renamed
-    if (![video respondsToSelector:@selector(playbackRate)]) return;
-
-    CGFloat rate = video.playbackRate != 0 ? video.playbackRate : 1.0;
+    // 21.x moved the rate from YTSingleVideoController.playbackRate to activePlaybackRateModel
+    CGFloat rate = [video respondsToSelector:@selector(playbackRate)] ? video.playbackRate : video.activePlaybackRateModel.rate;
+    if (rate == 0) rate = 1.0;
     NSTimeInterval remainingTime = (lround(video.totalMediaTime) - lround(time.time)) / rate;
 
     NSDate *estimatedEndTime = [NSDate dateWithTimeIntervalSinceNow:remainingTime];
@@ -501,7 +495,8 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
 %new
 - (void)turnOffCaptions {
     if ([self.view.superview isKindOfClass:NSClassFromString(@"YTWatchView")]) {
-        [self setActiveCaptionTrack:nil];
+        if ([self respondsToSelector:@selector(setActiveCaptionTrack:)]) [self setActiveCaptionTrack:nil];
+        else [self setActiveCaptionTrack:nil source:0];
     }
 }
 
@@ -1324,9 +1319,12 @@ BOOL isTabSelected = NO;
 
 %new
 - (void)didTapCopyInfoButton:(UIButton *)sender {
-    YTPlayerViewController *playerVC = self.resizeDelegate.parentViewController.parentViewController.parentViewController.playerViewController;
-    NSString *title = playerVC.playerResponse.playerData.videoDetails.title;
-    NSString *shortDescription = playerVC.playerResponse.playerData.videoDetails.shortDescription;
+    UIViewController *watchVC = (UIViewController *)self.resizeDelegate;
+    while (watchVC && ![watchVC respondsToSelector:@selector(playerViewController)]) watchVC = watchVC.parentViewController;
+    YTPlayerViewController *playerVC = [(id)watchVC playerViewController];
+    YTPlayerResponse *response = [playerVC respondsToSelector:@selector(playerResponse)] ? playerVC.playerResponse : playerVC.contentPlayerResponse;
+    NSString *title = response.playerData.videoDetails.title;
+    NSString *shortDescription = response.playerData.videoDetails.shortDescription;
 
     YTDefaultSheetController *sheetController = [%c(YTDefaultSheetController) sheetControllerWithParentResponder:nil];
 
@@ -1345,6 +1343,15 @@ BOOL isTabSelected = NO;
 %end
 
 CGFloat rateBeforeSpeedmaster = 1.0;
+
+static YTInlinePlayerScrubUserEducationView *ytlScrubEducationView(YTMainAppVideoPlayerOverlayViewController *delegate) {
+    YTMainAppVideoPlayerOverlayView *overlayView = delegate.videoPlayerOverlayView;
+    if ([overlayView respondsToSelector:@selector(scrubUserEducationView)]) return overlayView.scrubUserEducationView;
+    // 21.x keeps it on the double-tap-to-seek controller
+    Ivar ivar = class_getInstanceVariable([delegate class], "_doubleTapToSeekController");
+    id seekController = ivar ? object_getIvar(delegate, ivar) : nil;
+    return [seekController respondsToSelector:@selector(scrubUserEducationView)] ? [seekController scrubUserEducationView] : nil;
+}
 
 static void manageSpeedmasterYTLite(UILongPressGestureRecognizer *gesture, YTMainAppVideoPlayerOverlayViewController *delegate, YTInlinePlayerScrubUserEducationView *edu) {
     NSArray *speedLabels = @[@0, @2.0, @0.25, @0.5, @0.75, @1.0, @1.25, @1.5, @1.75, @2.0, @3.0, @4.0, @5.0];
@@ -1376,8 +1383,7 @@ static void manageSpeedmasterYTLite(UILongPressGestureRecognizer *gesture, YTMai
 
 %new
 - (void)speedmasterYtLite:(UILongPressGestureRecognizer *)gesture {
-    YTInlinePlayerScrubUserEducationView *edu = self.scrubUserEducationView;
-    manageSpeedmasterYTLite(gesture, self.delegate, edu);
+    manageSpeedmasterYTLite(gesture, self.delegate, ytlScrubEducationView(self.delegate));
 }
 %end
 
@@ -1387,8 +1393,7 @@ static void manageSpeedmasterYTLite(UILongPressGestureRecognizer *gesture, YTMai
     if (ytlInt(@"speedIndex") == 1) return %orig;
 
     YTMainAppVideoPlayerOverlayViewController *delegate = [self valueForKey:@"_delegate"];
-    YTInlinePlayerScrubUserEducationView *edu = (YTInlinePlayerScrubUserEducationView *)delegate.videoPlayerOverlayView.scrubUserEducationView;
-    manageSpeedmasterYTLite(gesture, delegate, edu);
+    manageSpeedmasterYTLite(gesture, delegate, ytlScrubEducationView(delegate));
 }
 %end
 
