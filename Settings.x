@@ -1,4 +1,9 @@
 #import "YTLite.h"
+#import "../YouTubeHeader/YTSettingsGroupData.h"
+
+@interface YTSettingsGroupData (YouGroupSettings)
++ (NSMutableArray <NSNumber *> *)tweaks;
+@end
 
 @interface YTSettingsSectionItemManager (YTLite)
 - (void)updateYTLiteSectionWithEntry:(id)entry;
@@ -32,6 +37,30 @@ static NSString *GetCacheSize() {
     if (insertIndex != NSNotFound)
         [mutableOrder insertObject:@(YTLiteSection) atIndex:insertIndex + 1];
     return mutableOrder;
+}
+%end
+
+// YouTube 21.x shows settings in groups, so settingsCategoryOrder alone no longer adds a row.
+// With YouGroupSettings installed, join its "Tweaks" group (it builds that group from +tweaks);
+// otherwise put YTLite first in the main group, like PoomSmart's tweaks do.
+%hook YTAppSettingsGroupPresentationData
++ (NSArray *)orderedGroups {
+    if ([%c(YTSettingsGroupData) respondsToSelector:@selector(tweaks)]) {
+        NSMutableArray *tweaks = [%c(YTSettingsGroupData) tweaks];
+        if (![tweaks containsObject:@(YTLiteSection)]) [tweaks insertObject:@(YTLiteSection) atIndex:0];
+    }
+    return %orig;
+}
+%end
+
+%hook YTSettingsGroupData
+- (NSArray <NSNumber *> *)orderedCategories {
+    NSArray *categories = %orig;
+    if (self.type != 1 || [%c(YTSettingsGroupData) respondsToSelector:@selector(tweaks)] || [categories containsObject:@(YTLiteSection)])
+        return categories;
+    NSMutableArray *mutableCategories = [categories mutableCopy];
+    [mutableCategories insertObject:@(YTLiteSection) atIndex:0];
+    return mutableCategories;
 }
 %end
 

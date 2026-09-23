@@ -38,6 +38,16 @@ on:
         required: false
         default: false
 
+      enable_youspeed:
+        type: boolean
+        required: false
+        default: false
+
+      enable_isb:
+        type: boolean
+        required: false
+        default: false
+
       tweak_version:
         type: string
         required: false
@@ -124,7 +134,7 @@ jobs:
           mv packages/*.deb ../ytplus.deb
 
       - name: Copy YouTubeHeader into Theos include (for optional tweaks)
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc || inputs.enable_ytx }}
+        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc || inputs.enable_ytx || inputs.enable_youspeed }}
         run: |
           rm -rf $THEOS/include/YouTubeHeader $THEOS/include/YTHeaders
           cp -r YouTubeHeader $THEOS/include/YouTubeHeader
@@ -133,7 +143,7 @@ jobs:
           fi
 
       - name: Clone PSHeader
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc || inputs.enable_ytx }}
+        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_ytabc || inputs.enable_demc || inputs.enable_ytx || inputs.enable_youspeed }}
         run: |
           if [ -d "$THEOS/include/PSHeader" ]; then
             cd $THEOS/include/PSHeader && git pull
@@ -158,7 +168,7 @@ jobs:
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YTABConfig.git
 
       - name: Clone YouGroupSettings
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc }}
+        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc || inputs.enable_youspeed }}
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouGroupSettings.git
 
       - name: Clone YouQuality
@@ -166,7 +176,7 @@ jobs:
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouQuality.git
 
       - name: Clone YTVideoOverlay
-        if: ${{ inputs.enable_yq || inputs.enable_youpip || inputs.enable_ytuhd }}
+        if: ${{ inputs.enable_yq || inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_youspeed }}
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YTVideoOverlay.git
 
       - name: Clone DontEatMyContent
@@ -176,6 +186,14 @@ jobs:
       - name: Clone YouTube-X
         if: ${{ inputs.enable_ytx }}
         run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouTube-X.git
+
+      - name: Clone YouSpeed
+        if: ${{ inputs.enable_youspeed }}
+        run: git clone --quiet --depth=1 https://github.com/PoomSmart/YouSpeed.git
+
+      - name: Clone iSponsorBlock
+        if: ${{ inputs.enable_isb }}
+        run: git clone --quiet --depth=1 https://github.com/Galactic-Dev/iSponsorBlock.git
 
       - name: Build YouPiP
         if: ${{ inputs.enable_youpip }}
@@ -206,7 +224,7 @@ jobs:
           mv packages/*.deb ../ytabc.deb
 
       - name: Build YouGroupSettings
-        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc }}
+        if: ${{ inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_yq || inputs.enable_ryd || inputs.enable_demc || inputs.enable_youspeed }}
         run: |
           cd YouGroupSettings && make clean package DEBUG=0 FINALPACKAGE=1
           mv packages/*.deb ../ygs.deb
@@ -218,7 +236,7 @@ jobs:
           mv packages/*.deb ../yq.deb
 
       - name: Build YTVideoOverlay
-        if: ${{ inputs.enable_yq || inputs.enable_youpip || inputs.enable_ytuhd }}
+        if: ${{ inputs.enable_yq || inputs.enable_youpip || inputs.enable_ytuhd || inputs.enable_youspeed }}
         run: |
           cd YTVideoOverlay && make clean package DEBUG=0 FINALPACKAGE=1
           mv packages/*.deb ../ytvo.deb
@@ -234,6 +252,22 @@ jobs:
         run: |
           cd YouTube-X && make clean package DEBUG=0 FINALPACKAGE=1
           mv packages/*.deb ../ytx.deb
+
+      - name: Build YouSpeed
+        if: ${{ inputs.enable_youspeed }}
+        run: |
+          cd YouSpeed && make clean package DEBUG=0 FINALPACKAGE=1
+          mv packages/*.deb ../youspeed.deb
+
+      - name: Build iSponsorBlock
+        if: ${{ inputs.enable_isb }}
+        run: |
+          cd iSponsorBlock
+          # libcolorpicker isn't available when sideloading; iSponsorBlock only looks the picker up at runtime,
+          # so without it the segment colour option is simply hidden
+          sed -i '' '/_LIBRARIES = colorpicker/d' Makefile
+          make clean package DEBUG=0 FINALPACKAGE=1
+          mv packages/*.deb ../isb.deb
 
       - name: Clone Open in YouTube (Safari extension)
         run: |

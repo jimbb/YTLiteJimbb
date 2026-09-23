@@ -57,6 +57,18 @@ on:
         required: true
         default: true
 
+      enable_youspeed:
+        description: "Integrate YouSpeed (speed button, up to 5x, slider)"
+        type: boolean
+        required: true
+        default: true
+
+      enable_isb:
+        description: "Integrate iSponsorBlock"
+        type: boolean
+        required: true
+        default: true
+
       tweak_version:
         description: "The version of the tweak to use. Enter the version manually from dayanch96/YTLite/releases or leave default"
         default: "5.2.1"
@@ -90,6 +102,8 @@ jobs:
       enable_ytabc: ${{ inputs.enable_ytabc }}
       enable_demc: ${{ inputs.enable_demc }}
       enable_ytx: ${{ inputs.enable_ytx }}
+      enable_youspeed: ${{ inputs.enable_youspeed }}
+      enable_isb: ${{ inputs.enable_isb }}
       tweak_version: ${{ inputs.tweak_version }}
 
   package:

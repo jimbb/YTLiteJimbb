@@ -45,6 +45,18 @@ on:
         required: true
         default: true
 
+      enable_youspeed:
+        description: "Integrate YouSpeed (speed button, up to 5x, slider)"
+        type: boolean
+        required: true
+        default: true
+
+      enable_isb:
+        description: "Integrate iSponsorBlock"
+        type: boolean
+        required: true
+        default: true
+
       ipa_url:
         description: "URL to the decrypted IPA file, or tag of a draft release in this repo with the .ipa attached"
         default: ""
@@ -90,6 +102,8 @@ jobs:
       enable_ytabc: ${{ inputs.enable_ytabc }}
       enable_demc: ${{ inputs.enable_demc }}
       enable_ytx: ${{ inputs.enable_ytx }}
+      enable_youspeed: ${{ inputs.enable_youspeed }}
+      enable_isb: ${{ inputs.enable_isb }}
       tweak_version: ${{ inputs.tweak_version }}
 
   package:
@@ -109,7 +123,7 @@ jobs:
       - name: Hide sensitive inputs
         uses: levibostian/action-hide-sensitive-inputs@v1
         with:
-          exclude_inputs: bundle_id,display_name,enable_demc,enable_ytx,enable_ryd,enable_ytabc,enable_youpip,enable_yq,enable_ytuhd,info_note,tweak_version
+          exclude_inputs: bundle_id,display_name,enable_demc,enable_ytx,enable_youspeed,enable_isb,enable_ryd,enable_ytabc,enable_youpip,enable_yq,enable_ytuhd,info_note,tweak_version
 
       - name: Download and validate IPA
         env:

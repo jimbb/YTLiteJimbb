@@ -352,6 +352,7 @@ static UIImage *YTImageNamed(NSString *imageName) {
 
     for (NSString *title in speedOptions) {
         float rate = [title floatValue];
+        if ([optionsCopy indexOfObjectPassingTest:^BOOL(YTVarispeedSwitchControllerOption *o, NSUInteger i, BOOL *stop) { return o.rate == rate; }] != NSNotFound) continue;
         YTVarispeedSwitchControllerOption *option = [[%c(YTVarispeedSwitchControllerOption) alloc] initWithTitle:title rate:rate];
         [optionsCopy addObject:option];
     }

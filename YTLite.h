@@ -294,6 +294,7 @@
 @end
 
 @interface YTVarispeedSwitchControllerOption : NSObject
+@property (nonatomic, readonly) float rate;
 - (id)initWithTitle:(NSString *)title rate:(float)rate;
 @end
 
