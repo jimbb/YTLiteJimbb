@@ -230,6 +230,7 @@ static UIImage *YTImageNamed(NSString *imageName) {
 - (BOOL)replacePreviousPaddleWithRewindButtonForSingletonVods { return ytlBool(@"replacePrevNext") ? YES : %orig; }
 // Disable Free Zoom
 - (BOOL)videoZoomFreeZoomEnabledGlobalConfig { return ytlBool(@"noFreeZoom") ? NO : %orig; }
+- (BOOL)videoZoomFreeZoomEnabled { return ytlBool(@"noFreeZoom") ? NO : %orig; }
 // Stick Sort Buttons in Comments Section
 - (BOOL)enableHideChipsInTheCommentsHeaderOnScrollIos { return ytlBool(@"stickSortComments") ? NO : %orig; }
 // Hide Sort Buttons in Comments Section
@@ -389,6 +390,10 @@ static UIImage *YTImageNamed(NSString *imageName) {
 - (void)didMoveToWindow { %orig; if (ytlBool(@"dontSnapToChapter")) self.enableSnapToChapter = NO; }
 %end
 
+%hook YTModularPlayerBarController
+- (void)setEnableSnapToChapter:(BOOL)arg1 { %orig(ytlBool(@"dontSnapToChapter") ? NO : arg1); }
+%end
+
 // Red Progress Bar and Gray Buffer Progress
 %hook YTInlinePlayerBarContainerView
 - (id)quietProgressBarColor { return ytlBool(@"redProgressBar") ? [UIColor redColor] : %orig; }
@@ -396,6 +401,10 @@ static UIImage *YTImageNamed(NSString *imageName) {
 
 %hook YTSegmentableInlinePlayerBarView
 - (void)setBufferedProgressBarColor:(id)arg1 { if (ytlBool(@"redProgressBar")) %orig([UIColor colorWithRed:0.65 green:0.65 blue:0.65 alpha:0.60]); }
+%end
+
+%hook YTPlayerBarSegmentView
+- (void)setBufferedProgressBarColor:(id)arg1 { %orig(ytlBool(@"redProgressBar") ? [UIColor colorWithRed:0.65 green:0.65 blue:0.65 alpha:0.60] : arg1); }
 %end
 
 // Disable Hints
@@ -458,8 +467,8 @@ void autoSkipShorts(YTPlayerViewController *self, YTSingleVideoController *video
     [self ytlApplyLoadPrefs];
 }
 
-// YouTube 21.3x+ renamed the above
-- (void)loadWithPlayerTransition:(id)arg1 playbackConfig:(id)arg2 initialTime:(id)arg3 {
+// YouTube 21.3x+ no longer has the above on YTPlayerViewController
+- (void)prepareToLoadWithPlayerTransition:(id)arg1 expectedLayout:(id)arg2 {
     %orig;
     [self ytlApplyLoadPrefs];
 }
@@ -1417,7 +1426,12 @@ static NSURL *newCoverURL(NSURL *originalURL) {
 // }
 // %end
 
+// YouTube 21.x turned many classes into protocols backed by *Impl classes; use the old class when it still exists
+#define YTL_OR_IMPL(c) (objc_getClass(#c) ?: objc_getClass(#c "Impl"))
+
 %ctor {
+    %init(YTPromoThrottleController = YTL_OR_IMPL(YTPromoThrottleController), YTSettings = YTL_OR_IMPL(YTSettings), YTPlayabilityResolutionUserActionUIController = YTL_OR_IMPL(YTPlayabilityResolutionUserActionUIController), YTVideoQualitySwitchControllerFactory = YTL_OR_IMPL(YTVideoQualitySwitchControllerFactory), YTVarispeedSwitchController = YTL_OR_IMPL(YTVarispeedSwitchController), YTMenuItemVisibilityHandler = YTL_OR_IMPL(YTMenuItemVisibilityHandler), YTShortsStartupCoordinator = YTL_OR_IMPL(YTShortsStartupCoordinator), YTAppViewController = YTL_OR_IMPL(YTAppViewController), YTWatchMiniBarViewController = (objc_getClass("YTWatchMiniBarViewController") ?: objc_getClass("YTWatchFloatingMiniplayerViewController")), YTDataUtils = (objc_getClass("YTAdShieldUtils") ?: objc_getClass("YTDataUtils")));
+
     if (ytlBool(@"shortsOnlyMode") && (ytlBool(@"removeShorts") || ytlBool(@"reExplore"))) {
         ytlSetBool(NO, @"removeShorts");
         ytlSetBool(NO, @"reExplore");
